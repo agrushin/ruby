@@ -1,0 +1,13 @@
+simple.warning.queue.name:
+    general: { warning: 5000, critical: 15001 }
+    unacked: { warning: 100, critical: 500 }
+
+!ruby/regexp '/bulk$/':
+    general: { warning: 4096, critical: 8192 }
+
+!ruby/regexp '/^sbulk1/':
+    general: { warning: 4096000, critical: 8192000 }
+
+default:
+    general: { warning: 12345, critical: 67890 }
+    unacked: { warning: 123, critical: 456 }
