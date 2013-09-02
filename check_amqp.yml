@@ -1,13 +1,16 @@
-simple.warning.queue.name:
-    general: { warning: 5000, critical: 15001 }
-    unacked: { warning: 100, critical: 500 }
+slow.as.pipeline.distill:
+    general: { warning: 100, critical: 150 }
+    unacked: { warning: 100, critical: 150 }
 
-!ruby/regexp '/bulk$/':
-    general: { warning: 4096, critical: 8192 }
+!ruby/regexp '/check_view/':
+    general: { warning: 20000, critical: 25000 }
 
-!ruby/regexp '/^sbulk1/':
-    general: { warning: 4096000, critical: 8192000 }
+!ruby/regexp '/bulk/':
+    general: { warning: 3000000, critical: 5000000 }
+
+!ruby/regexp '/incoming$/':
+    general: { warning: 1, critical: 5 }
 
 default:
-    general: { warning: 12345, critical: 67890 }
-    unacked: { warning: 123, critical: 456 }
+    general: { warning: 3000, critical: 5000 }
+    unacked: { warning: 800, critical: 1000 }
