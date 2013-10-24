@@ -25,8 +25,18 @@ end
 
 # http://docs.aws.amazon.com/AWSEC2/latest/APIReference/ApiReference-query-DescribeImages.html
 # http://docs.aws.amazon.com/AWSRubySDK/latest/AWS/EC2/Client/V20131001.html#describe_images-instance_method
-def getImagesIdWithPrefix( amiprefix )
+def getImagesFiltered( _ec2, _amiprefix )
+  my_images = Hash.new
+  my_images_filtered = _ec2.images.with_owner('self').filter("name", "#{_amiprefix} *")
+  my_images_filtered.each { |image| my_images[image.image_id]=image.name.split(' ')[1].scan(/\d+$/).to_s }
 
+  if $options[:verbose]
+    puts "Available images: "
+    my_images_sorted = my_images.sort { |a,b| a.last <=> b.last }
+    my_images_sorted.each { |image, description| puts "#{image}: Description = #{my_images_filtered[image].name}" }
+  end
+
+  my_images  
 end
 
 config_file = File.join(File.dirname(__FILE__), "as_launch_config_ctl.yml")
@@ -63,5 +73,8 @@ $options[:azone] = 'us-west-1a' if $options[:azone].nil?
 AWS.config( $config )
 
 ec2 = AWS::EC2.new( $config )
+my_images_filtered = getImagesFiltered( ec2, $options[:amiprefix] )
 
-#info( 'I', 'test123')
+bestId = my_images_filtered.max_by { |k,v| v }
+puts "Image candidate: #{bestId[0]}"
+
