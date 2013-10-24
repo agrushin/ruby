@@ -1,6 +1,8 @@
-Nagios test for RabbitMQ queues.
+check_amqp.rb: Nagios test for RabbitMQ queues.
 
-Just declare your thresholds for queues in check_amqp.yml (you can use static names, regexp or just declare default). Then run:
+Thresholds need to be specified in check_amqp.yml file. You ned to specify at least default thresholds.
+But you can overwrite thresholds for queues using static names or regexp. Just take a look for example.
+Then just run to get result:
 
 $ ./check_amqp.rb -H rabbitmq0.domain.tld
 AMQP queues is OK:
