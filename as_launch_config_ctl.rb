@@ -33,11 +33,18 @@ def getImagesFiltered( _ec2, _amiprefix )
 
   if $options[:verbose]
     puts "Available images: "
-    my_images_sorted = my_images.sort { |a,b| a.last <=> b.last }
+    my_images_sorted = my_images.sort { |a, b| a.last <=> b.last }
     my_images_sorted.each { |image, description| puts "#{image}: Description = #{my_images_filtered[image].name}" }
   end
 
   my_images
+end
+
+def getAutoScalingGroupsFiltered( _asgroups, _asgprefix )
+  my_groups_filtered = Hash.new
+  _asgroups.each { |group| my_groups_filtered[group.name]=group.launch_configuration_name if group.name.include? $options[:asgprefix].to_s }
+
+  my_groups_filtered
 end
 
 config_file = File.join(File.dirname(__FILE__), "as_launch_config_ctl.yml")
@@ -73,25 +80,30 @@ $options[:azone] = 'us-west-1a' if $options[:azone].nil?
 
 AWS.config( $config )
 ec2 = AWS::EC2.new( $config )
+as = AWS::AutoScaling.new( $config )
 
 if $options[:amiprefix]
-
-  puts "Trying to find image using AMI name filter"
+  puts "Trying to find image using AMI name filter " + $options[:amiprefix].to_s
   my_images_filtered = getImagesFiltered( ec2, $options[:amiprefix] )
-  bestId = my_images_filtered.max_by { |k,v| v }
-  puts "Image candidate: #{bestId[0]}"
-
+  freshImage = my_images_filtered.max_by { |k,v| v }
+  bestId = freshImage[0]
+  puts "Image candidate: #{bestId}"
 elsif $options[:amiid]
-
-  puts "Using image specified in command line"
+  puts "Using image specified in command line" + $options[:amiid].to_s
   img = ec2.images[$options[:amiid]]
   if img.exists?
     bestId = img.image_id
   else
     fail "Cannot find specified AMI"
   end
+end
 
+asgroups = as.groups
+if $options[:asgprefix]
+  puts "Trying to find AS groups list using filter " + $options[:asgprefix].to_s
+  pp getAutoScalingGroupsFiltered( asgroups, $options[:asgprefix].to_s )
+elsif $options[:asgid]
+  puts "Using autoscaling group specified in command line" + $options[:asgid].to_s
 end
 
 puts "results: ami=#{bestId}"
-
