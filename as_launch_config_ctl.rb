@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 #
 # TODO:
+# - '--test' cmd option (without any modifications)
 # - Debug/verbose logging
 # - Dump states before and after modifications: ASG, LC configs
-# - Waiting for confirms before modifications?
 #
 require 'rubygems'
 require 'yaml'
@@ -64,6 +64,13 @@ def createUpdatedLaunchConfig( _as, _sourceLaunchConfig, _attrsOverride )
   _as.launch_configurations.create( newLC['name'], newLC['image_id'], newLC['instance_type'], :user_data => newLC['user_data'] )
   rescue Exception => e
     puts "Error while trying to create launch config: #{e.message}"
+end
+
+def setAutoScaleGroupOption( _asg, _options )
+  _options.each do |option, value|
+    puts "ASG-UPDATE: #{_asg.name}[#{option}] => #{value}"
+    _asg.update( option => value )
+  end
 end
 
 config_file = File.join(File.dirname(__FILE__), "as_launch_config_ctl.yml")
@@ -127,18 +134,21 @@ elsif $options[:asgid]
 end
 
 asgToUpdate.each do |asgName, lcName|
-  puts "LC-CREATE: Going to create new Launch Config for #{asgName}(#{lcName}) with #{bestId}"
 
   attrsOverride = Hash.new
   attrsOverride['image_id'] = bestId
   lcName.scan(/^(lc\-.+\-)(\d+)$/) { |configPrefix,configIndex| attrsOverride['name'] = "#{configPrefix}"+(configIndex.to_i+1).to_s }
 
-  newLaunchConfig = createUpdatedLaunchConfig( as, as.launch_configurations[lcName], attrsOverride )
-  unless newLaunchConfig.nil?
-    puts "ASG-UPDATE: Going to switch LaunchConfig for #{asgName} from #{lcName} to #{newLaunchConfig.name}"
+  if bestId != as.launch_configurations[lcName].image_id
+    puts "LC-CREATE: Going to create new Launch Config for #{asgName}(#{lcName} -> " + attrsOverride['name'] + ") with #{bestId}"
+    newLaunchConfig = createUpdatedLaunchConfig( as, as.launch_configurations[lcName], attrsOverride )
+
+    unless newLaunchConfig.nil?
+      puts "ASG-UPDATE: Going to switch LaunchConfig for #{asgName} from #{lcName} to #{newLaunchConfig.name}"
+      setAutoScaleGroupOption( as.groups[asgName], { :launch_configuration => newLaunchConfig.name } )
+    end
+  else
+    puts "LC-CREATE: #{asgName}(#{lcName}) is up to date already(#{as.launch_configurations[lcName].image_id}), skipping"
   end
+
 end
-
-# lc_id = createUpdatedLaunchConfig( sourceLaunchConfig, paramsToModify )
-# switchAutoScalingGroupLaunchConfig( asg_name, lc_name )
-
