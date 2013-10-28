@@ -109,28 +109,39 @@ ec2 = AWS::EC2.new( $config )
 as = AWS::AutoScaling.new( $config )
 
 if $options[:amiprefix]
+
   puts "AMI-SEARCH: Searching for image using AMI name filter '" + $options[:amiprefix].to_s + "'"
   my_images_filtered = getImagesFiltered( ec2, $options[:amiprefix] )
   # TODO: catch case if list is empty
   freshImage = my_images_filtered.max_by { |k,v| v }
   bestId = freshImage[0]
   puts "AMI-SEARCH: Image candidate found: #{bestId}"
+
 elsif $options[:amiid]
-  puts "AMI-SEARCH: Using image specified in command line" + $options[:amiid].to_s
+
+  puts "AMI-SEARCH: Using image specified in command line '" + $options[:amiid].to_s + "'"
   img = ec2.images[$options[:amiid]]
   if img.exists?
     bestId = img.image_id
   else
     fail "AMI-SEARCH: Cannot find specified AMI"
   end
+
 end
 
 asgroups = as.groups
 if $options[:asgprefix]
+
   puts "ASG-SEARCH: Searching for AS groups using filter '" + $options[:asgprefix].to_s + "'"
   asgToUpdate = getAutoScalingGroupsFiltered( asgroups, $options[:asgprefix].to_s )
+
 elsif $options[:asgid]
-  puts "ASG-SEARCH: Using autoscaling group specified in command line" + $options[:asgid].to_s
+
+  puts "ASG-SEARCH: Using autoscaling group specified in command line '" + $options[:asgid].to_s + "'"
+  asg = as.groups[$options[:asgid]]
+  asgToUpdate = Hash.new
+  asgToUpdate[asg.name] = asg.launch_configuration_name
+
 end
 
 asgToUpdate.each do |asgName, lcName|
@@ -142,7 +153,6 @@ asgToUpdate.each do |asgName, lcName|
   if bestId != as.launch_configurations[lcName].image_id
     puts "LC-CREATE: Going to create new Launch Config for #{asgName}(#{lcName} -> " + attrsOverride['name'] + ") with #{bestId}"
     newLaunchConfig = createUpdatedLaunchConfig( as, as.launch_configurations[lcName], attrsOverride )
-
     unless newLaunchConfig.nil?
       puts "ASG-UPDATE: Going to switch LaunchConfig for #{asgName} from #{lcName} to #{newLaunchConfig.name}"
       setAutoScaleGroupOption( as.groups[asgName], { :launch_configuration => newLaunchConfig.name } )
