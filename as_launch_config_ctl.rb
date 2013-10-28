@@ -1,5 +1,10 @@
 #!/usr/bin/env ruby
 #
+# TODO:
+# - Debug/verbose logging
+# - Dump states before and after modifications: ASG, LC configs
+# - Waiting for confirms before modifications?
+#
 require 'rubygems'
 require 'yaml'
 require 'aws-sdk'
@@ -47,6 +52,20 @@ def getAutoScalingGroupsFiltered( _asgroups, _asgprefix )
   my_groups_filtered
 end
 
+def createUpdatedLaunchConfig( _as, _sourceLaunchConfig, _attrsOverride )
+  newLC = Hash.new
+  newLC['name'] = _sourceLaunchConfig.name
+  newLC['image_id'] = _sourceLaunchConfig.image_id
+  newLC['instance_type'] = _sourceLaunchConfig.instance_type
+  newLC['user_data'] = _sourceLaunchConfig.user_data
+
+  _attrsOverride.each { |attr, value| newLC[attr] = value if newLC[attr] != value }
+
+  _as.launch_configurations.create( newLC['name'], newLC['image_id'], newLC['instance_type'], :user_data => newLC['user_data'] )
+  rescue Exception => e
+    puts "Error while trying to create launch config: #{e.message}"
+end
+
 config_file = File.join(File.dirname(__FILE__), "as_launch_config_ctl.yml")
 unless File.exist?(config_file)
     puts <<END
@@ -83,27 +102,43 @@ ec2 = AWS::EC2.new( $config )
 as = AWS::AutoScaling.new( $config )
 
 if $options[:amiprefix]
-  puts "Trying to find image using AMI name filter " + $options[:amiprefix].to_s
+  puts "AMI-SEARCH: Searching for image using AMI name filter '" + $options[:amiprefix].to_s + "'"
   my_images_filtered = getImagesFiltered( ec2, $options[:amiprefix] )
+  # TODO: catch case if list is empty
   freshImage = my_images_filtered.max_by { |k,v| v }
   bestId = freshImage[0]
-  puts "Image candidate: #{bestId}"
+  puts "AMI-SEARCH: Image candidate found: #{bestId}"
 elsif $options[:amiid]
-  puts "Using image specified in command line" + $options[:amiid].to_s
+  puts "AMI-SEARCH: Using image specified in command line" + $options[:amiid].to_s
   img = ec2.images[$options[:amiid]]
   if img.exists?
     bestId = img.image_id
   else
-    fail "Cannot find specified AMI"
+    fail "AMI-SEARCH: Cannot find specified AMI"
   end
 end
 
 asgroups = as.groups
 if $options[:asgprefix]
-  puts "Trying to find AS groups list using filter " + $options[:asgprefix].to_s
-  pp getAutoScalingGroupsFiltered( asgroups, $options[:asgprefix].to_s )
+  puts "ASG-SEARCH: Searching for AS groups using filter '" + $options[:asgprefix].to_s + "'"
+  asgToUpdate = getAutoScalingGroupsFiltered( asgroups, $options[:asgprefix].to_s )
 elsif $options[:asgid]
-  puts "Using autoscaling group specified in command line" + $options[:asgid].to_s
+  puts "ASG-SEARCH: Using autoscaling group specified in command line" + $options[:asgid].to_s
 end
 
-puts "results: ami=#{bestId}"
+asgToUpdate.each do |asgName, lcName|
+  puts "LC-CREATE: Going to create new Launch Config for #{asgName}(#{lcName}) with #{bestId}"
+
+  attrsOverride = Hash.new
+  attrsOverride['image_id'] = bestId
+  lcName.scan(/^(lc\-.+\-)(\d+)$/) { |configPrefix,configIndex| attrsOverride['name'] = "#{configPrefix}"+(configIndex.to_i+1).to_s }
+
+  newLaunchConfig = createUpdatedLaunchConfig( as, as.launch_configurations[lcName], attrsOverride )
+  unless newLaunchConfig.nil?
+    puts "ASG-UPDATE: Going to switch LaunchConfig for #{asgName} from #{lcName} to #{newLaunchConfig.name}"
+  end
+end
+
+# lc_id = createUpdatedLaunchConfig( sourceLaunchConfig, paramsToModify )
+# switchAutoScalingGroupLaunchConfig( asg_name, lc_name )
+
