@@ -177,7 +177,7 @@ if $options[:mode] == 'upgrade'
       end
       unless newLaunchConfig.nil?
         puts "ASG-UPDATE: Going to switch LaunchConfig for #{asgName} from #{lcName} to #{newLaunchConfig.name}"
-        #setAutoScaleGroupOption( as.groups[asgName], { :launch_configuration => newLaunchConfig.name } )
+        setAutoScaleGroupOption( as.groups[asgName], { :launch_configuration => newLaunchConfig.name } )
       end
     else
       puts "LC-CREATE: #{asgName}(#{lcName}) is up to date already(#{as.launch_configurations[lcName].image_id}), skipping"
