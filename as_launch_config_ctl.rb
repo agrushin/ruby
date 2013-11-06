@@ -29,8 +29,8 @@ OptionParser.new do |opts|
   opts.separator("")
   opts.separator("Common options: ")
   opts.on('-z', '--availability-zone AZONE', 'AWS EC2 availability zone') { |setting| $options[:azone] = setting }
-  opts.on('-t', '--test', 'Dont make any changes') { |setting| $options[:test] = setting }
-  opts.on('-v', '--verbose', 'Run verbosily' ) { |setting| $options[:verbose] = setting }
+  opts.on('-t', '--test', '[TODO] Dont make any changes') { |setting| $options[:test] = setting }
+  opts.on('-v', '--verbose', '[TODO] Run verbosily' ) { |setting| $options[:verbose] = setting }
   opts.on_tail('-h', '--help', '--usage', 'Show this usage message and quit.') { |setting| puts opts.help; exit }
 end.parse!
 
@@ -75,10 +75,19 @@ def createUpdatedLaunchConfig( _as, _sourceLaunchConfig, _attrsOverride )
   newLC['image_id'] = _sourceLaunchConfig.image_id
   newLC['instance_type'] = _sourceLaunchConfig.instance_type
   newLC['user_data'] = _sourceLaunchConfig.user_data
+  newLC['security_groups'] = []
+
+  unless _sourceLaunchConfig.security_groups.nil?
+    _sourceLaunchConfig.security_groups.each { |sg| newLC['security_groups'].push(sg.name) }
+  end
 
   _attrsOverride.each { |attr, value| newLC[attr] = value if newLC[attr] != value }
 
-  _as.launch_configurations.create( newLC['name'], newLC['image_id'], newLC['instance_type'], :user_data => newLC['user_data'] )
+  newOptions = Hash.new
+  newOptions[:user_data] = newLC['user_data']
+  newOptions[:security_groups] = newLC['security_groups'] unless newLC['security_groups'].nil?
+
+  _as.launch_configurations.create( newLC['name'], newLC['image_id'], newLC['instance_type'], newOptions )
   rescue Exception => e
     puts "Error while trying to create launch config: #{e.message}"
 end
@@ -205,6 +214,6 @@ elsif $options[:mode] == 'clear'
   end
 
 else
-  puts "Unknown mode: " + $options[:mode]
+  puts "Unknown mode: " + $options[:mode].to_s + "; try --help for usage manual"
 
 end
