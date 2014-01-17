@@ -1,11 +1,12 @@
 #!/usr/bin/env ruby
 #
-# ./check_asg_state.rb -H ASGNAME -r <REGION> -t|--maintenance-windows <"Mon 06:00-10:00;Tue 06:00-10:00;Wed 06:00-10:00;Tue 06:00-10:00;">
+# * Nagios plugin to check AWS autoscaling group status
 #
 require 'rubygems'
 require 'optparse'
 require 'pp'
 require 'aws-sdk'
+require 'date'
 
 options = {}
 op = OptionParser.new do |opts|
@@ -14,11 +15,10 @@ op = OptionParser.new do |opts|
   opts.separator("")
   opts.separator("Options: ")
   opts.on('-t', '--maintenance-windows <weekDay startTime:stopTime>', 'Silently check (return OK during specified time periods specified in UTC).') { |setting| options[:maintenanceWindows] = setting }
-  opts.on('-r', '--region <AWS_REGION>', 'Use AWS region (default: us-west-1)') { |setting| options[:region] = setting }
   opts.on('-h', '--help', '--usage', 'Show this usage message and quit.') { |setting| puts opts.help; exit }
   opts.on_tail.separator("")
   opts.on_tail.separator('Examples: ')
-  opts.on_tail.separator('  check_asg_state.rb -G asg-cnn-nvuc0r-1 -t "Mon 06:00-10:00,16:00-17:00;Tue 06:00-10:00;Wed 06:00-10:00;Tue 06:00-10:00;"')
+  opts.on_tail.separator('  check_asg_state.rb -G asg-testgroup-1 -t "Tue 06:00-10:00;Wed 06:00-09:00,09:00-10:00;Thu 06:00-10:00;"')
 end
 
 begin op.parse! ARGV
@@ -63,6 +63,19 @@ END
   exit 1
 end
 
+def maintenanceActiveNow?( maintenanceSchedule )
+  now = Time.now.utc
+  sched = {}
+  maintenanceSchedule.split(";").each { |day| day.gsub(/(\w+)\s(.*)/) { sched[$1] = $2 } }
+  if sched[Date::ABBR_DAYNAMES[now.wday]]
+    sched[Date::ABBR_DAYNAMES[now.wday]].split(',').each do |tp|
+      tstart = tstop = nil
+      tp.gsub(/(([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])\-(([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])/) { tstart, tstop = $1, $3 }
+      return (tstart..tstop).include?(now.strftime("%H:%M"))
+    end
+  end
+end
+
 AWS.config( $config )
 as = AWS::AutoScaling.new
 asg = as.groups[options[:asgname]]
@@ -72,8 +85,13 @@ begin
     puts "OK: All processes are active"
     exit 0
   else
-    puts "CRITICAL: #{asg.suspended_processes.keys.join(", ")} are not active"
-    exit 2
+    if options[:maintenanceWindows] && maintenanceActiveNow?(options[:maintenanceWindows])
+      puts "OK: #{asg.suspended_processes.keys.join(", ")} suspended, but maintenance in progress"
+      exit 0
+    else
+      puts "CRITICAL: #{asg.suspended_processes.keys.join(", ")} suspended"
+      exit 2
+    end
   end
   rescue AWS::Core::Resource::NotFound => err
     puts "UNKNOWN: #{options[:asgname]} not found (#{err})"
