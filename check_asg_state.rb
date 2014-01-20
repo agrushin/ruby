@@ -63,7 +63,7 @@ END
   exit 1
 end
 
-def maintenanceActiveNow?( maintenanceSchedule )
+def isMaintenanceActiveNow?( maintenanceSchedule )
   now = Time.now.utc
   sched = {}
   maintenanceSchedule.split(";").each { |day| day.gsub(/(\w+)\s(.*)/) { sched[$1] = $2 } }
@@ -85,7 +85,7 @@ begin
     puts "OK: All processes are active"
     exit 0
   else
-    if options[:maintenanceWindows] && maintenanceActiveNow?(options[:maintenanceWindows])
+    if options[:maintenanceWindows] && isMaintenanceActiveNow?(options[:maintenanceWindows])
       puts "OK: #{asg.suspended_processes.keys.join(", ")} suspended, but maintenance in progress"
       exit 0
     else
