@@ -85,24 +85,28 @@ return_code = 0
 if states['InService'].count < instances_count
   (thresholds[:warning_number], thresholds[:warning_percent]) = options[:warning].split(':') if options[:warning]
   (thresholds[:critical_number], thresholds[:critical_percent]) = options[:critical].split(':') if options[:critical]
+  [:warning_number, :warning_percent, :critical_number, :critical_percent].each { |st| thresholds[st] = nil if thresholds[st] == '' }
 
-  if (instances_count - states['InService'].count) >= thresholds[:critical_number].to_i || \
-    (((instances_count - states['InService'].count) * 100) / instances_count) >= thresholds[:critical_percent].to_i
+  unhealthy_count = instances_count - states['InService'].count
+  unhealthy_percent = ((instances_count - states['InService'].count) * 100) / instances_count
+
+  if (!thresholds[:critical_number].nil? && unhealthy_count >= thresholds[:critical_number].to_i) || \
+    (!thresholds[:critical_percent].nil? && unhealthy_percent >= thresholds[:critical_percent].to_i)
     return_code = 2
     message = "CRITICAL: "
-    states.each { |state,members| message << "#{state}: " + members.join(', ') unless members.empty? }
+    states.each { |state,members| message << " #{state}: " + members.join(', ') unless members.empty? }
 
-  elsif (instances_count - states['InService'].count) >= thresholds[:warning_number].to_i || \
-    (((instances_count - states['InService'].count) * 100) / instances_count) >= thresholds[:warning_percent].to_i
+  elsif (!thresholds[:warning_number].nil? && unhealthy_count >= thresholds[:warning_number].to_i) || \
+    (!thresholds[:warning_percent].nil? && unhealthy_percent >= thresholds[:warning_percent].to_i)
     return_code = 1
     message = "WARNING: "
-    states.each { |state,members| message << "#{state}: " + members.join(', ') unless members.empty? }
+    states.each { |state,members| message << " #{state}: " + members.join(', ') unless members.empty? }
 
   end
 
 else
   message = "OK | "
-  states.each { |state,members| message << "#{state}: " + members.join(', ') unless members.empty? }
+  states.each { |state,members| message << " #{state}: " + members.join(', ') unless members.empty? }
 
 end
 
