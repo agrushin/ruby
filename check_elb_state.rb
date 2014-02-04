@@ -101,7 +101,10 @@ if states['InService'].count < instances_count
     return_code = 1
     message = "WARNING: "
     states.each { |state,members| message << " #{state}: " + members.join(', ') unless members.empty? }
-
+  else
+    return_code = 2
+    message = "CRITICAL: "
+    states.each { |state,members| message << " #{state}: " + members.join(', ') unless members.empty? }
   end
 
 else
