@@ -66,6 +66,10 @@ elb = AWS::ELB.new
 begin
   instances = elb.load_balancers[options[:elbname]].instances.health
   instances_count = instances.count
+  if instances_count == 0
+    puts "ELB UNKNOWN: there are no instances registered with this ELB"
+    exit 3
+  end
 
 rescue AWS::ELB::Errors::LoadBalancerNotFound => err
   puts "ELB UNKNOWN: #{options[:elbname]} not found (#{err})"
